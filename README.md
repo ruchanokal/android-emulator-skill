@@ -358,32 +358,6 @@ android-emulator-skill/
     └── emulator_wipe.py              # Factory reset AVDs
 ```
 
-## Comparison with iOS Simulator Skill
-
-This skill was inspired by [ios-simulator-skill](https://github.com/anthropics/ios-simulator-skill) and includes all 21 equivalent scripts plus 8 Android-exclusive features:
-
-| Feature | iOS Simulator Skill | Android Emulator Skill |
-|---------|:---:|:---:|
-| Screen mapping & navigation | Yes | Yes |
-| Gesture control | Yes | Yes |
-| Keyboard input | Yes | Yes |
-| App lifecycle | Yes | Yes |
-| Build & test | Yes | Yes |
-| Log monitoring | Yes | Yes |
-| Accessibility audit | Yes | Yes |
-| Screenshot & visual diff | Yes | Yes |
-| Permissions | Yes | Yes |
-| Notifications | Yes | Yes |
-| Device lifecycle | Yes | Yes |
-| **Network throttling** | No | **Yes** |
-| **GPS mocking** | No | **Yes** |
-| **Screen recording** | No | **Yes** |
-| **Device settings (locale, dark mode, DPI)** | No | **Yes** |
-| **Intent/deep link testing** | No | **Yes** |
-| **Fuzz testing (monkey)** | No | **Yes** |
-| **File push/pull/DB inspect** | No | **Yes** |
-| **Port forwarding** | No | **Yes** |
-
 ## License
 
 MIT License — see [LICENSE](LICENSE) for details.
