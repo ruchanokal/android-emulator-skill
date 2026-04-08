@@ -26,8 +26,25 @@ class Navigator:
     def _invalidate_cache(self):
         self._tree_cache = None
 
+    def _find_clickable_parent(self, elem):
+        """Find the nearest clickable parent for a text element (Compose pattern)."""
+        elements = self._get_elements()
+        for other in elements:
+            if (other["clickable"] and
+                other["bounds"]["x1"] <= elem["bounds"]["x1"] and
+                other["bounds"]["y1"] <= elem["bounds"]["y1"] and
+                other["bounds"]["x2"] >= elem["bounds"]["x2"] and
+                other["bounds"]["y2"] >= elem["bounds"]["y2"] and
+                other is not elem):
+                return other
+        return None
+
     def find_by_text(self, text, exact=False, index=0):
-        """Find elements by text content (text or content-desc)."""
+        """Find elements by text content (text or content-desc).
+
+        For Compose UIs: if a text match is found on a non-clickable element,
+        looks for a clickable parent and returns that instead (for tapping).
+        """
         elements = self._get_elements()
         matches = []
         text_lower = text.lower()
@@ -36,12 +53,29 @@ class Navigator:
             elem_text = (elem["text"] or "").lower()
             elem_desc = (elem["content_desc"] or "").lower()
 
+            matched = False
             if exact:
-                if elem_text == text_lower or elem_desc == text_lower:
-                    matches.append(elem)
+                matched = (elem_text == text_lower or elem_desc == text_lower)
             else:
-                if text_lower in elem_text or text_lower in elem_desc:
+                matched = (text_lower in elem_text or text_lower in elem_desc)
+
+            if matched:
+                # If elem itself is clickable, use it directly
+                if elem["clickable"] or elem["focusable"]:
                     matches.append(elem)
+                else:
+                    # Compose pattern: text is in child, clickable is on parent
+                    parent = self._find_clickable_parent(elem)
+                    if parent and parent not in matches:
+                        # Copy text info to parent for display purposes
+                        if not parent["text"] and not parent["content_desc"]:
+                            parent = dict(parent)
+                            parent["text"] = elem["text"]
+                            parent["content_desc"] = elem["content_desc"]
+                        matches.append(parent)
+                    else:
+                        # No clickable parent, return the text element itself
+                        matches.append(elem)
 
         if not matches:
             return None

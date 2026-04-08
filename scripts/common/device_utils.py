@@ -5,6 +5,47 @@ import subprocess
 import sys
 import re
 import json
+import os
+import shutil
+
+
+def _find_android_sdk():
+    """Find Android SDK path and add tools to PATH if needed."""
+    # Check if adb is already in PATH
+    if shutil.which("adb"):
+        return
+
+    # Common SDK locations
+    sdk_paths = [
+        os.environ.get("ANDROID_HOME", ""),
+        os.environ.get("ANDROID_SDK_ROOT", ""),
+        os.path.expanduser("~/Library/Android/sdk"),  # macOS default
+        os.path.expanduser("~/Android/Sdk"),  # Linux default
+        "C:\\Users\\{}\\AppData\\Local\\Android\\Sdk".format(os.environ.get("USERNAME", "")),  # Windows
+    ]
+
+    for sdk in sdk_paths:
+        if sdk and os.path.isdir(sdk):
+            platform_tools = os.path.join(sdk, "platform-tools")
+            emulator_dir = os.path.join(sdk, "emulator")
+            cmdline_tools = os.path.join(sdk, "cmdline-tools", "latest", "bin")
+
+            additions = []
+            if os.path.isdir(platform_tools):
+                additions.append(platform_tools)
+            if os.path.isdir(emulator_dir):
+                additions.append(emulator_dir)
+            if os.path.isdir(cmdline_tools):
+                additions.append(cmdline_tools)
+
+            if additions:
+                os.environ["PATH"] = os.pathsep.join(additions) + os.pathsep + os.environ.get("PATH", "")
+                os.environ["ANDROID_HOME"] = sdk
+                return
+
+
+# Auto-detect SDK on import
+_find_android_sdk()
 
 
 def build_adb_command(args, serial=None):

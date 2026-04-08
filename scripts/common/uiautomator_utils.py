@@ -9,20 +9,25 @@ from .device_utils import build_adb_command, run_command
 
 def get_ui_hierarchy(serial=None):
     """Dump and parse the UI hierarchy via uiautomator."""
-    dump_cmd = build_adb_command(["shell", "uiautomator", "dump", "/dev/tty"], serial=serial)
-    result = run_command(dump_cmd, timeout=15)
+    device_path = "/sdcard/window_dump.xml"
 
+    # Dump to file on device (most reliable method)
+    dump_cmd = build_adb_command(
+        ["shell", "uiautomator", "dump", device_path], serial=serial
+    )
+    dump_result = run_command(dump_cmd, timeout=15)
+
+    if not dump_result or dump_result.returncode != 0:
+        print("Failed to dump UI hierarchy", file=sys.stderr)
+        sys.exit(1)
+
+    # Read the file from device
+    result = run_command(build_adb_command(
+        ["shell", "cat", device_path], serial=serial
+    ))
     if not result or result.returncode != 0:
-        # Fallback: dump to file and pull
-        run_command(build_adb_command(
-            ["shell", "uiautomator", "dump", "/sdcard/window_dump.xml"], serial=serial
-        ))
-        result = run_command(build_adb_command(
-            ["shell", "cat", "/sdcard/window_dump.xml"], serial=serial
-        ))
-        if not result or result.returncode != 0:
-            print("Failed to dump UI hierarchy", file=sys.stderr)
-            sys.exit(1)
+        print("Failed to read UI hierarchy from device", file=sys.stderr)
+        sys.exit(1)
 
     xml_content = result.stdout.strip()
     # Remove any non-XML prefix (uiautomator sometimes outputs extra text)

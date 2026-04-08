@@ -5,7 +5,7 @@ import argparse
 import json
 import sys
 import os
-import telnetlib
+import socket
 import re
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
@@ -42,31 +42,48 @@ def _get_auth_token():
 
 
 def _send_console_command(serial, command):
-    """Send a command to the emulator console via telnet."""
+    """Send a command to the emulator console via socket."""
     port = _get_emulator_port(serial)
     if not port:
         return False, "Cannot determine emulator console port"
 
     try:
-        tn = telnetlib.Telnet("localhost", port, timeout=5)
+        sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        sock.settimeout(5)
+        sock.connect(("localhost", port))
+
         # Read welcome message
-        tn.read_until(b"OK", timeout=3)
+        _recv_until(sock, b"OK")
 
         # Authenticate
         token = _get_auth_token()
         if token:
-            tn.write(f"auth {token}\n".encode())
-            tn.read_until(b"OK", timeout=3)
+            sock.sendall(f"auth {token}\n".encode())
+            _recv_until(sock, b"OK")
 
         # Send command
-        tn.write(f"{command}\n".encode())
-        response = tn.read_until(b"OK", timeout=5).decode()
+        sock.sendall(f"{command}\n".encode())
+        response = _recv_until(sock, b"OK")
 
-        tn.write(b"quit\n")
-        tn.close()
+        sock.sendall(b"quit\n")
+        sock.close()
         return True, response.strip()
     except Exception as e:
         return False, str(e)
+
+
+def _recv_until(sock, marker, bufsize=4096):
+    """Read from socket until marker is found."""
+    data = b""
+    while marker not in data:
+        try:
+            chunk = sock.recv(bufsize)
+            if not chunk:
+                break
+            data += chunk
+        except socket.timeout:
+            break
+    return data.decode(errors="replace")
 
 
 def set_wifi(serial, enabled):

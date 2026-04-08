@@ -6,7 +6,7 @@ import json
 import sys
 import os
 import re
-import telnetlib
+import socket
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from common.device_utils import resolve_serial, build_adb_command, run_command
@@ -48,6 +48,20 @@ def _get_auth_token():
     return ""
 
 
+def _recv_until(sock, marker, bufsize=4096):
+    """Read from socket until marker is found."""
+    data = b""
+    while marker not in data:
+        try:
+            chunk = sock.recv(bufsize)
+            if not chunk:
+                break
+            data += chunk
+        except socket.timeout:
+            break
+    return data.decode(errors="replace")
+
+
 def set_location(serial, lat, lng, altitude=0):
     """Set GPS location via emulator console."""
     port = _get_emulator_port(serial)
@@ -55,20 +69,23 @@ def set_location(serial, lat, lng, altitude=0):
         return False, "Cannot determine emulator console port (is this an emulator?)"
 
     try:
-        tn = telnetlib.Telnet("localhost", port, timeout=5)
-        tn.read_until(b"OK", timeout=3)
+        sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        sock.settimeout(5)
+        sock.connect(("localhost", port))
+
+        _recv_until(sock, b"OK")
 
         token = _get_auth_token()
         if token:
-            tn.write(f"auth {token}\n".encode())
-            tn.read_until(b"OK", timeout=3)
+            sock.sendall(f"auth {token}\n".encode())
+            _recv_until(sock, b"OK")
 
         cmd = f"geo fix {lng} {lat} {altitude}"
-        tn.write(f"{cmd}\n".encode())
-        response = tn.read_until(b"OK", timeout=5).decode()
+        sock.sendall(f"{cmd}\n".encode())
+        response = _recv_until(sock, b"OK")
 
-        tn.write(b"quit\n")
-        tn.close()
+        sock.sendall(b"quit\n")
+        sock.close()
 
         return True, f"Location set to ({lat}, {lng})"
     except Exception as e:

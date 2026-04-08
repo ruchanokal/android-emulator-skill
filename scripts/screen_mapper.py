@@ -36,22 +36,58 @@ class ScreenMapper:
         for elem in self.elements:
             if elem["clickable"] or elem["checkable"] or elem["focusable"]:
                 short_class = get_short_class(elem["class"])
-                if short_class in ("View", "FrameLayout", "LinearLayout", "RelativeLayout", "ConstraintLayout"):
-                    # Skip generic containers unless they have text
-                    if not elem["text"] and not elem["content_desc"]:
+                has_label = elem["text"] or elem["content_desc"]
+                # For Compose UIs: clickable Views with child text are buttons
+                # Skip only truly empty containers (no text, no desc, no clickable children)
+                if short_class in ("FrameLayout", "LinearLayout", "RelativeLayout", "ConstraintLayout"):
+                    if not has_label:
                         continue
+                # For View (common in Compose), include if clickable — even without direct text
+                # because Compose wraps text in child nodes
+                if short_class == "View" and not has_label and not elem["clickable"]:
+                    continue
                 interactive.append(elem)
         return interactive
+
+    def _find_child_text(self, elem):
+        """Find text in child elements (for Compose clickable Views)."""
+        for other in self.elements:
+            if (other["depth"] > elem["depth"] and
+                other["bounds"]["x1"] >= elem["bounds"]["x1"] and
+                other["bounds"]["y1"] >= elem["bounds"]["y1"] and
+                other["bounds"]["x2"] <= elem["bounds"]["x2"] and
+                other["bounds"]["y2"] <= elem["bounds"]["y2"]):
+                if other["text"]:
+                    return other["text"]
+                if other["content_desc"]:
+                    return other["content_desc"]
+        return None
 
     def get_buttons(self):
         """Get button elements."""
         buttons = []
         for elem in self.elements:
             short_class = get_short_class(elem["class"])
-            is_button = "Button" in short_class or (elem["clickable"] and (elem["text"] or elem["content_desc"]))
-            if is_button:
-                label = elem["text"] or elem["content_desc"] or "(unnamed)"
-                if label != "(unnamed)":
+            has_direct_label = elem["text"] or elem["content_desc"]
+
+            is_button = False
+            label = None
+
+            if "Button" in short_class:
+                is_button = True
+                label = elem["text"] or elem["content_desc"]
+            elif elem["clickable"] and has_direct_label:
+                is_button = True
+                label = elem["text"] or elem["content_desc"]
+            elif elem["clickable"] and short_class == "View":
+                # Compose pattern: clickable View with child TextView
+                child_text = self._find_child_text(elem)
+                if child_text:
+                    is_button = True
+                    label = child_text
+
+            if is_button and label and label != "(unnamed)":
+                if label not in buttons:  # Avoid duplicates
                     buttons.append(label)
         return buttons
 
